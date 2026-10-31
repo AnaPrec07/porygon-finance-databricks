@@ -1,0 +1,22 @@
+resources:
+  pipelines:
+    ingest_pipeline:
+      name: porygon-ingest
+      catalog: ${var.catalog}
+      schema: ${resources.schemas.bronze.name}
+      serverless: true
+      channel: CURRENT
+      continuous: false # triggered only: no always-on compute
+      libraries:
+        - glob:
+            include: ../src/porygon/pipelines/**
+      environment:
+        dependencies:
+          - ../dist/*.whl
+      configuration:
+        porygon.catalog: ${var.catalog}
+        porygon.schema.bronze: ${resources.schemas.bronze.name}
+        porygon.schema.silver: ${resources.schemas.silver.name}
+        porygon.schema.gold: ${resources.schemas.gold.name}
+        porygon.schema.ops: ${resources.schemas.ops.name}
+        porygon.landing_path: /Volumes/${var.catalog}/${resources.schemas.bronze.name}/landing

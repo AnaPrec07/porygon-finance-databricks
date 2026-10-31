@@ -1,0 +1,59 @@
+# Schemas per layer. Grants encode the privacy model: in prod only service principals read user data;
+# the founder group reads `shared` only. Bronze is readable by nobody except its owner (pipeline SP).
+resources:
+  schemas:
+    bronze:
+      catalog_name: ${var.catalog}
+      name: bronze
+      comment: "Raw ingested statement files (binary) and file metadata. Contains financial data. Owner-only access."
+      grants:
+        - principal: ${var.pipeline_sp}
+          privileges: [ALL_PRIVILEGES]
+    silver:
+      catalog_name: ${var.catalog}
+      name: silver
+      comment: "Normalized, categorized transactions and duplicate flags. Contains financial data."
+      grants:
+        - principal: ${var.pipeline_sp}
+          privileges: [ALL_PRIVILEGES]
+        - principal: ${var.api_sp}
+          privileges: [USE_SCHEMA, SELECT]
+    gold:
+      catalog_name: ${var.catalog}
+      name: gold
+      comment: "Per-user monthly summary and category breakdown. API data contract lives in docs/data-contracts.md."
+      grants:
+        - principal: ${var.pipeline_sp}
+          privileges: [ALL_PRIVILEGES]
+        - principal: ${var.api_sp}
+          privileges: [USE_SCHEMA, SELECT]
+    shared:
+      catalog_name: ${var.catalog}
+      name: shared
+      comment: "Pseudonymized, opt-in results for the founder. No transaction details."
+      grants:
+        - principal: ${var.pipeline_sp}
+          privileges: [ALL_PRIVILEGES]
+        - principal: ${var.founder_group}
+          privileges: [USE_SCHEMA, SELECT]
+    ops:
+      catalog_name: ${var.catalog}
+      name: ops
+      comment: "Quarantine (reason codes only, no PII), data-quality, cost and audit views."
+      grants:
+        - principal: ${var.pipeline_sp}
+          privileges: [ALL_PRIVILEGES]
+        - principal: ${var.data_admins_group}
+          privileges: [USE_SCHEMA, SELECT]
+
+  volumes:
+    landing:
+      catalog_name: ${var.catalog}
+      schema_name: ${resources.schemas.bronze.name}
+      name: landing
+      volume_type: EXTERNAL
+      storage_location: ${var.landing_s3_url}
+      comment: "Landing zone for statement files, one prefix per user_id. Files are deleted after successful ingestion."
+      grants:
+        - principal: ${var.pipeline_sp}
+          privileges: [ALL_PRIVILEGES]
