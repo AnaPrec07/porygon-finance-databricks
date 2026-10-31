@@ -1,0 +1,75 @@
+# Porygon Finance Pilot - Databricks Asset Bundle (data plane: landing -> bronze -> silver -> gold -> shared)
+# Workspace host/auth come from the CLI profile or env (DATABRICKS_HOST, DATABRICKS_CLIENT_ID, ...), never from this file.
+bundle:
+  name: porygon-finance
+
+include:
+  - resources/*.yml
+
+artifacts:
+  porygon_wheel:
+    type: whl
+    build: python -m build --wheel
+    path: .
+
+variables:
+  catalog:
+    description: Unity Catalog catalog for this environment (one catalog per env, created by infra/uc_bootstrap.sql).
+  landing_s3_url:
+    description: S3 URL backing the external volume for statement files (SSE-KMS bucket).
+  pipeline_sp:
+    description: Service principal (application ID) that owns and runs pipelines. In dev, the current user.
+    default: ${workspace.current_user.userName}
+  api_sp:
+    description: Service principal used by the FastAPI layer. Gets read on silver/gold only.
+    default: ${workspace.current_user.userName}
+  founder_group:
+    description: Group that may read the `shared` schema only.
+    default: ${workspace.current_user.userName}
+  data_admins_group:
+    description: Group with read on `ops` (quarantine reasons, audit/cost views). No user-data tables.
+    default: ${workspace.current_user.userName}
+  alert_email:
+    description: Address for job failure / duration alerts. Alerts never contain transaction details.
+    default: ${workspace.current_user.userName}
+  owner_tag:
+    description: Value for the `owner` cost tag.
+    default: data-engineering
+
+targets:
+  dev:
+    mode: development # per-developer prefixes; schedules/triggers paused
+    default: true
+    variables:
+      catalog: porygon_dev
+      landing_s3_url: s3://REPLACE-porygon-dev-landing/landing
+
+  staging:
+    mode: production
+    variables:
+      catalog: porygon_staging
+      landing_s3_url: s3://REPLACE-porygon-staging-landing/landing
+      pipeline_sp: REPLACE-staging-pipeline-sp-application-id
+      api_sp: REPLACE-staging-api-sp-application-id
+      founder_group: porygon-founder-staging
+      data_admins_group: porygon-data-admins
+      alert_email: REPLACE@example.com
+    workspace:
+      root_path: /Workspace/Shared/.bundle/${bundle.name}/${bundle.target}
+    run_as:
+      service_principal_name: ${var.pipeline_sp}
+
+  prod:
+    mode: production
+    variables:
+      catalog: porygon_prod
+      landing_s3_url: s3://REPLACE-porygon-prod-landing/landing
+      pipeline_sp: REPLACE-prod-pipeline-sp-application-id
+      api_sp: REPLACE-prod-api-sp-application-id
+      founder_group: porygon-founder
+      data_admins_group: porygon-data-admins
+      alert_email: REPLACE@example.com
+    workspace:
+      root_path: /Workspace/Shared/.bundle/${bundle.name}/${bundle.target}
+    run_as:
+      service_principal_name: ${var.pipeline_sp}

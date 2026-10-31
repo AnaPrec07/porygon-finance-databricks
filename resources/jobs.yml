@@ -1,0 +1,58 @@
+resources:
+  jobs:
+    ingest_job:
+      name: porygon-ingest
+      description: "Runs the ingest pipeline when a statement file lands, then deletes landed files that are committed to bronze."
+      max_concurrent_runs: 1
+      queue:
+        enabled: true
+      tags:
+        project: porygon-finance
+        env: ${bundle.target}
+        owner: ${var.owner_tag}
+      trigger:
+        pause_status: UNPAUSED # dev mode pauses it automatically
+        file_arrival:
+          url: /Volumes/${var.catalog}/${resources.schemas.bronze.name}/landing/
+          min_time_between_triggers_seconds: 60
+          wait_after_last_change_seconds: 30
+      email_notifications:
+        on_failure:
+          - ${var.alert_email}
+        on_duration_warning_threshold_exceeded:
+          - ${var.alert_email}
+      health:
+        rules:
+          - metric: RUN_DURATION_SECONDS
+            op: GREATER_THAN
+            value: 900
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "3"
+            dependencies:
+              - ../dist/*.whl
+      tasks:
+        - task_key: run_pipeline
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.ingest_pipeline.id}
+            full_refresh: false
+          max_retries: 2
+          min_retry_interval_millis: 60000
+          retry_on_timeout: false
+        - task_key: purge_landed_files
+          depends_on:
+            - task_key: run_pipeline
+          environment_key: default
+          python_wheel_task:
+            package_name: porygon
+            entry_point: purge_landed_files
+            parameters:
+              - --catalog
+              - ${var.catalog}
+              - --bronze-schema
+              - ${resources.schemas.bronze.name}
+              - --landing-path
+              - /Volumes/${var.catalog}/${resources.schemas.bronze.name}/landing
+          max_retries: 2
+          min_retry_interval_millis: 60000
