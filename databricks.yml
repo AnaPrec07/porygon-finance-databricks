@@ -42,7 +42,7 @@ targets:
     default: true
     variables:
       catalog: porygon_dev
-      landing_s3_url: s3://REPLACE-porygon-dev-landing/landing
+      landing_s3_url: s3://porygon-landing-zone-271565898467-us-east-2-an/landing
 
   staging:
     mode: production
