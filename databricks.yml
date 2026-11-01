@@ -14,7 +14,7 @@ artifacts:
 
 variables:
   catalog:
-    description: Unity Catalog catalog for this environment (one catalog per env, created by infra/uc_bootstrap.sql).
+    description: Unity Catalog catalog for this environment (one catalog per env, created by infra/bootstrap_landing_zone.py).
   landing_s3_url:
     description: S3 URL backing the external volume for statement files (SSE-KMS bucket).
   pipeline_sp:
@@ -42,7 +42,7 @@ targets:
     default: true
     variables:
       catalog: porygon_dev
-      landing_s3_url: s3://REPLACE-porygon-dev-landing/landing
+      landing_s3_url: s3://REPLACE-porygon-dev-landing/landing # override: BUNDLE_VAR_landing_s3_url (see infra/.env.example)
 
   staging:
     mode: production
