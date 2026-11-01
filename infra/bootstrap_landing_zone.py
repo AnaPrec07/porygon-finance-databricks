@@ -4,6 +4,7 @@ Run once per environment from a machine with AWS credentials (IAM permissions) a
 (env vars or a profile) that can create storage credentials / external locations:
 
     pip install boto3 databricks-sdk
+    set -a; source infra/.env; set +a      # copy infra/.env.example to infra/.env first (git-ignored)
     python infra/bootstrap_landing_zone.py
 
 NOT idempotent: re-running fails at `create_policy` / `create_role` because they already exist.
@@ -13,16 +14,26 @@ the CMK exists. See docs/adr/0002-privacy-and-access-model.md.
 """
 
 import json
+import os
 import time
 
 import boto3
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.catalog import AwsIamRoleRequest, PermissionsChange, Privilege, SecurableType
 
-ACCOUNT = "271565898467"
-BUCKET = "porygon-landing-zone-271565898467-us-east-2-an"
-ROLE = "databricks-uc-landing-zone"
-UC_MASTER = "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"
+
+def _env(name: str) -> str:
+    value = os.environ.get(name)
+    if not value:
+        raise SystemExit(f"Missing required environment variable: {name} (see infra/.env.example)")
+    return value
+
+
+ACCOUNT = _env("AWS_ACCOUNT_ID")
+BUCKET = _env("LANDING_BUCKET")
+ROLE = os.environ.get("UC_ROLE_NAME", "databricks-uc-landing-zone")
+UC_MASTER = _env("UC_MASTER_ROLE_ARN")  # Databricks' Unity Catalog master role for your region
+GRANTEE_GROUP = os.environ.get("LANDING_GRANTEE_GROUP", "data-engineers")
 ROLE_ARN = f"arn:aws:iam::{ACCOUNT}:role/{ROLE}"
 
 iam = boto3.client("iam")
@@ -94,7 +105,5 @@ w.external_locations.create(
 w.grants.update(
     securable_type=SecurableType.EXTERNAL_LOCATION,
     full_name="porygon-landing-zone",
-    changes=[
-        PermissionsChange(principal="data-engineers", add=[Privilege.READ_FILES, Privilege.WRITE_FILES])
-    ],
+    changes=[PermissionsChange(principal=GRANTEE_GROUP, add=[Privilege.READ_FILES, Privilege.WRITE_FILES])],
 )
