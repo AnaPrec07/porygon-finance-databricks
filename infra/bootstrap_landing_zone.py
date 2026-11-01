@@ -1,5 +1,6 @@
 """One-time, admin-run: IAM role, UC storage credential and external location for the landing bucket.
 
+Creates the IAM role, storage credential, external location, catalog and grants.
 Run once per environment from a machine with AWS credentials (IAM permissions) and Databricks auth
 (env vars or a profile) that can create storage credentials / external locations:
 
@@ -106,4 +107,36 @@ w.grants.update(
     securable_type=SecurableType.EXTERNAL_LOCATION,
     full_name="porygon-landing-zone",
     changes=[PermissionsChange(principal=GRANTEE_GROUP, add=[Privilege.READ_FILES, Privilege.WRITE_FILES])],
+)
+
+# 6. Catalog, owners and grants
+LOCATION = "porygon-landing-zone"
+CATALOG = _env("UC_CATALOG")  # e.g. porygon_dev
+ADMINS = _env("PLATFORM_ADMINS_GROUP")
+PIPELINE_SP = _env("PIPELINE_SP")
+API_SP = _env("API_SP")
+FOUNDER_GROUP = _env("FOUNDER_GROUP")
+
+w.catalogs.create(name=CATALOG, comment=f"Porygon Finance Pilot data platform ({CATALOG}).")
+w.catalogs.update(name=CATALOG, owner=ADMINS)
+w.external_locations.update(name=LOCATION, owner=ADMINS)
+
+w.grants.update(
+    securable_type=SecurableType.CATALOG,
+    full_name=CATALOG,
+    changes=[
+        PermissionsChange(principal=PIPELINE_SP, add=[Privilege.USE_CATALOG, Privilege.CREATE_SCHEMA]),
+        PermissionsChange(principal=API_SP, add=[Privilege.USE_CATALOG]),
+        PermissionsChange(principal=FOUNDER_GROUP, add=[Privilege.USE_CATALOG]),
+    ],
+)
+w.grants.update(
+    securable_type=SecurableType.EXTERNAL_LOCATION,
+    full_name=LOCATION,
+    changes=[
+        PermissionsChange(
+            principal=PIPELINE_SP,
+            add=[Privilege.CREATE_EXTERNAL_VOLUME, Privilege.READ_FILES, Privilege.WRITE_FILES],
+        )
+    ],
 )
