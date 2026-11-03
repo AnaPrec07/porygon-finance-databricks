@@ -11,5 +11,5 @@ databricks bundle validate -t dev
 databricks bundle deploy -t dev
 ```
 
-Before first deploy: run `infra/uc_bootstrap.sql` once per environment and replace the `REPLACE` values in `databricks.yml`.
+Before first deploy: run `python infra/bootstrap_landing_zone.py` once per environment (see `infra/.env.example`) and replace the `REPLACE` values in `databricks.yml`.
 Synthetic data only: never commit real statements.
